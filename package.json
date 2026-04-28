@@ -1,0 +1,36 @@
+{
+  "name": "lpl-language",
+  "displayName": "LPL Language Support",
+  "description": "Syntax highlighting for the LPL mathematical modeling language",
+  "version": "0.1.0",
+  "publisher": "lpl-community",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "lpl",
+        "aliases": [
+          "LPL",
+          "lpl"
+        ],
+        "extensions": [
+          ".lpl",
+          ".inc"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "lpl",
+        "scopeName": "source.lpl",
+        "path": "./syntaxes/lpl.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,261 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "LPL",
+  "scopeName": "source.lpl",
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#keywords-model" },
+    { "include": "#keywords-declaration" },
+    { "include": "#keywords-type" },
+    { "include": "#keywords-objective" },
+    { "include": "#keywords-control" },
+    { "include": "#keywords-logical" },
+    { "include": "#operators" },
+    { "include": "#builtin-functions" },
+    { "include": "#draw-functions" },
+    { "include": "#solver-names" },
+    { "include": "#description-string" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.block.documentation.lpl",
+          "begin": "/\\*\\*",
+          "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.lpl" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.lpl" } }
+        },
+        {
+          "name": "comment.block.lpl",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "beginCaptures": { "0": { "name": "punctuation.definition.comment.begin.lpl" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.comment.end.lpl" } }
+        },
+        {
+          "name": "comment.line.double-slash.lpl",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.line.double-dash.lpl",
+          "match": "--.*$"
+        }
+      ]
+    },
+
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.single.lpl",
+          "begin": "'",
+          "end": "'",
+          "beginCaptures": { "0": { "name": "punctuation.definition.string.begin.lpl" } },
+          "endCaptures": { "0": { "name": "punctuation.definition.string.end.lpl" } },
+          "patterns": [
+            {
+              "name": "constant.character.escape.lpl",
+              "match": "\\\\[ntr\\\\']"
+            },
+            {
+              "name": "constant.other.placeholder.lpl",
+              "match": "%-?\\d*\\.?\\d*[dsfFeEgGtx%]"
+            }
+          ]
+        }
+      ]
+    },
+
+    "description-string": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.lpl",
+          "match": "\"[^\"]*\""
+        }
+      ]
+    },
+
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.lpl",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.integer.lpl",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+
+    "keywords-model": {
+      "patterns": [
+        {
+          "comment": "model Name 'description' — capture name as entity for clean outline",
+          "match": "\\b(model)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+          "captures": {
+            "1": { "name": "keyword.control.model.lpl" },
+            "2": { "name": "entity.name.class.lpl" }
+          }
+        },
+        {
+          "name": "keyword.control.model.lpl",
+          "match": "\\bend\\b"
+        }
+      ]
+    },
+
+    "keywords-declaration": {
+      "patterns": [
+        {
+          "name": "keyword.declaration.lpl",
+          "match": "\\b(parameter|variable|constraint|set)\\b"
+        }
+      ]
+    },
+
+    "keywords-type": {
+      "patterns": [
+        {
+          "name": "storage.type.lpl",
+          "match": "\\b(binary|integer|string|alldiff|float|real)\\b"
+        }
+      ]
+    },
+
+    "keywords-objective": {
+      "patterns": [
+        {
+          "name": "keyword.other.objective.lpl",
+          "match": "\\b(maximize|minimize)\\b"
+        }
+      ]
+    },
+
+    "keywords-control": {
+      "patterns": [
+        {
+          "name": "keyword.control.lpl",
+          "match": "\\b(if|then|else|for|while|do|solve|subject_to|priority)\\b"
+        }
+      ]
+    },
+
+    "keywords-logical": {
+      "patterns": [
+        {
+          "name": "keyword.operator.logical.lpl",
+          "match": "\\b(and|or|not|nand|in|exist|forall|exactly|atleast|atmost)\\b"
+        }
+      ]
+    },
+
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.assignment.lpl",
+          "match": ":="
+        },
+        {
+          "name": "keyword.operator.biconditional.lpl",
+          "match": "<->"
+        },
+        {
+          "name": "keyword.operator.implication.lpl",
+          "match": "->"
+        },
+        {
+          "name": "keyword.operator.comparison.lpl",
+          "match": "<=|>=|<>|<|>|="
+        },
+        {
+          "name": "keyword.operator.range.lpl",
+          "match": "\\.\\."
+        },
+        {
+          "name": "keyword.operator.arithmetic.lpl",
+          "match": "[+\\-*/%^]"
+        },
+        {
+          "name": "keyword.operator.logical.not.lpl",
+          "match": "~"
+        },
+        {
+          "name": "keyword.operator.concatenation.lpl",
+          "match": "&"
+        },
+        {
+          "name": "keyword.operator.cardinality.lpl",
+          "match": "#"
+        }
+      ]
+    },
+
+    "builtin-functions": {
+      "patterns": [
+        {
+          "name": "support.function.io.lpl",
+          "match": "\\b(Write|Writep|Read|Format)\\b"
+        },
+        {
+          "name": "support.function.math.lpl",
+          "match": "\\b(Abs|Floor|Ceil|Max|Min|Trunc|Rnd|Sqrt|Exp|Ln|Log|Log2|Sin|Cos|Tan|Asin|Acos|Atan|Round|Mod|Sign)\\b"
+        },
+        {
+          "name": "support.function.aggregation.lpl",
+          "match": "\\b(sum|prod|argmax|argmin|Alldiff|Alldiffer)\\b"
+        },
+        {
+          "name": "support.function.string.lpl",
+          "match": "\\b(StringToSet|Split|Strsub|Strpos|Strfloat|DateToStr|Strlen|Strcat)\\b"
+        },
+        {
+          "name": "support.function.solver.lpl",
+          "match": "\\b(SetSolver|GetSolverStatus|GetViolations|GetParam|GetParamS|GetValue|GetName|GetAllSlacks|ClearData|NextFocus|NextPosition|SetParam)\\b"
+        },
+        {
+          "name": "support.function.system.lpl",
+          "match": "\\b(Now|Sl|if)\\b"
+        }
+      ]
+    },
+
+    "draw-functions": {
+      "patterns": [
+        {
+          "name": "support.function.draw.lpl",
+          "match": "\\bDraw\\.[A-Za-z]+\\b"
+        }
+      ]
+    },
+
+    "solver-names": {
+      "patterns": [
+        {
+          "name": "constant.other.solver.lpl",
+          "match": "\\b(gurobiLSol|cplexLSol|nosolver|InterSol|xpressLSol|hexalyLSol)\\b"
+        }
+      ]
+    },
+
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.terminator.lpl",
+          "match": ";"
+        },
+        {
+          "name": "punctuation.separator.colon.lpl",
+          "match": ":"
+        },
+        {
+          "name": "punctuation.separator.comma.lpl",
+          "match": ","
+        }
+      ]
+    }
+  }
+}

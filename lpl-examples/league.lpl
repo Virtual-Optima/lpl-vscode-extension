@@ -1,0 +1,543 @@
+model Tournament "Round-robin tournament (Version 6.43)";  
+  /** Solver parameters */
+  parameter seed:=[17];
+  parameter timeLimit:=25000;
+  SetSolver(gurobiLSol,'TimeLimit='& timeLimit &';Seed='& seed);
+  --SetSolver(gurobiLSol,'MIPSTART=1;TimeLimit='&timeLimit&';Seed='& seed);
+  --SetSolver(cplexLSol,'TILIM='& timeLimit);
+  --SetSolver(nosolver);
+  --SetSolver(InterSol);
+  
+  /** Main Procedure */
+  Input;
+  loop:=1; SolverStatus:=0; Vio{c}:=0;
+  if NMO=0 then Main0; end;
+  if NMO>0 and NMO<7 then Main1; end;       
+  if NMO=7 then Main2; end;       
+  SolverObj:=sum{c} Pen*Vio;
+  
+  if SolverStatus>=6 then SecondOpt; end 
+  if SolverStatus>=6 then Output; end 
+  ------------- END MAIN ----------------
+
+  /*$I 'league.inc' */
+
+  ---------------------------------------
+  model Main0 "Verify a Solution";
+    ReadSolFromXLS;
+    while loop<=NNR do
+      anf:=(loop-1)*KK+1; ende:=loop*KK; mid:=ende+1;
+      VerifyRR;
+      loop:=loop+1;
+      if SolverStatus<6 then loop:=NNR+1; end 
+      if NNR>=loop then 
+        anf:=(loop-1)*KK+1; ende:=loop*KK; mid:=ende+1;
+        VerifyRR;
+        loop:=loop+1;
+        if SolverStatus<6 then loop:=NNR+1; end 
+        --loop:=NNR+1; //to end immediately
+      end
+    end
+  end
+
+  model Main1 "Run 2-RR in two phases";
+    while loop<=NNR do
+      anf:=(loop-1)*KK+1; ende:=loop*KK; mid:=ende+1; 
+      FirstRR;
+      loop:=loop+1;
+      if SolverStatus<6 then loop:=NNR+1; end 
+      if NNR>=loop then 
+        anf:=(loop-1)*KK+1; ende:=loop*KK; mid:=anf;
+        SecondRR;
+        loop:=loop+1;
+        if SolverStatus<6 then loop:=NNR+1; end 
+        --loop:=NNR+1; //to end immediately
+      end
+    end
+  end
+
+  model Main2 "Run double RR in one phase";
+    while loop<=NNR do
+      if NNR>loop then 
+        anf:=(loop-1)*KK+1; ende:=(loop+1)*KK; mid:=loop*KK+1;
+        DoubleRR;
+        loop:=loop+2;
+        if SolverStatus<6 then loop:=NNR+1; end 
+      else 
+        anf:=(loop-1)*KK+1; ende:=loop*KK; mid:=ende+1;
+        FirstRR;
+        loop:=loop+1;
+        if SolverStatus<6 then loop:=NNR+1; end
+      end;
+    end
+    //GetAllSlacks;
+  end
+
+       
+  model Common1 "Defining all Common Constraints";
+
+    if warmStart then 
+--      x{i,j,K}:=ZZ;
+      --SetSolver(gurobiLSol,'TimeLimit=36000;MIPSTART=1;Seed='& seed);
+    end;
+
+    /** Relations derived from FX for all constraints */
+    //if loop%2=0 and lo=0 then {FX[c,i,j,k,w,s]|Pen<=30} (FX:=0, Fx:=0); Writep(FX,Fx); end;
+    //if loop%2=0 and lo=1 then {FXX[c,i,j,k,w,s]} (FX:=FXX, Fx:=Fxx); Writep(FX,Fx);  end;
+    set FX01{c,i,j,k}; FX02{c,i,j,k}; FX05{c,i,j,k}; FX06{c,i,j,j1,k}; FX06a{c,i,j1,k};
+      FX07{c,i,j,j1};
+      FX11{c,i,k}; FX12{c,i,k}; FX13{c,i,k}; FX14{c,i,k}; FX15{c,i,k}; FX16{c,i,k};
+      FX17{c,i,k}; FX18{c,i,k}; FX19{c,i,k}; FX20{c,i,k}; FX21{c,i,j}; FX22{c,j}; 
+      FX23a{c,i}; FX28a{c,i}; FX28i{c,i,j,j1}; FX28k{k,k1};
+      FX23{c,i,j}; FX28{c,i,j};
+      FX31{c,i}; FX32{c,i}; FX33{c,i}; FX34{c,i};  FX35{c,i};
+      FX36{c,i}; FX37{c,i}; FX38{c,i}; FX39{c,i}; FX43{c,i}; FX49{c,i};
+      FX50{c,i,j}; FX50a{c,k};
+    {FX[c,i,j,k,w,s]} 
+      if(FX= 1,FX01:=1,  FX= 2,FX02:=1,
+         FX= 5,FX05:=1,  FX= 6,(FX06[c,i,j,REG,k]:=1,FX06a[c,i,REG,k]:=1),     
+         FX= 7,FX07[c,i,j,REG]:=1,
+         FX=11,FX11:=1,  FX=12,FX12:=1,  FX=13,FX13:=1,  FX=14,FX14:=1,
+         FX=15,FX15:=1,  FX=16,FX16:=1,  FX=17,FX17:=1,  FX=18,FX18:=1,
+         FX=19,FX19:=1,  FX=20,FX20:=1,  FX=21,FX21:=1,  FX=22,FX22:=1, 
+         --FX=23,FX23:=1, FX=28,FX28:=1,   
+         FX=23,FX23a:=1, FX=28,FX28a:=1,   
+         FX=31,FX31:=1,  FX=32,FX32:=1,  FX=33,FX33:=1,  FX=34,FX34:=1,
+         FX=35,FX35:=1,  FX=36,FX36:=1,  FX=37,FX37:=1,  FX=38,FX38:=1,
+         FX=39,FX39:=1,  FX=43,FX43:=1,  FX=49,FX49:=1, FX=50,(FX50:=1,FX50a:=1));;
+    FX23{c,i,j|FX23a[c,i] and FX23a[c,j] and i<>j}:=1;
+    FX28{c,i,j|FX28a[c,i] and FX28a[c,j] and i<>j}:=1;
+
+//    FX28i{c,i,j,j1|FX28a[c,j] and FX28a[c,j1] and i<>j and i<>j1 and j<>j1} := 1;
+//    FX28k{k,k1} := k and (k<k1<=k+1);
+    
+    parameter Q{i,j,k} "Match distance between and after two RR";
+    if loop%2=0            then {i,j,t,t1|Z[j,i,anf-t] and t1>=t} (Q[i,j,anf-t+t1]:=1); end;
+    if loop>1 and loop%2=1 then {i,j,t,t1|Z[j,i,anf-t] and t1>=t} (Q[i,j,anf-t+t1]:=1,Q[j,i,anf-t+t1]:=1); end;
+
+    constraint
+--      WarmStart{i,j,k} if warmStart: x=ZZ;
+      A3a{Q[i,j,k]} if ~BC[7] and loop%2=1: x=0  "Respect distance after two RR";
+      A3b{Q[i,j,k]} if ~BC[7] and loop%2=0: x=0  "Respect distance between two RR";
+      A3c{i,j,t,t1|i<>j and t1>=t} if ~BC[7] and runDouble: x[i,j,ende-KK+1-t] + x[j,i,ende-KK+1-t+t1] <= 1;
+      A3d{i,j,K,t|i<>j} if ~BC[1]: x[i,j,k] + x[j,i,k+t] <= 1 "Respect distance when no two separate RR"; 
+      
+      AB{kij[k,i,j]|K and block}: x = 1  "User blocked matches";
+        
+      /** Definition of zH, zA, ZH, ZA, ZB, and ZN */   
+      A4a{i,K}:       zH <-> or{j|j<>i} x[i,j,k];
+      A4b{i,K}:       zA <-> or{j|j<>i} x[j,i,k];
+      A5a{i,K|k>anf}: ZH <-> zH and zH[i,k-1];
+      A5a0{i}: ZH[i,1]=0 and ZA[i,1]=0 and ZB[i,1]=0;    
+      A5a1{i} if anf>1: if(ZzH[i,anf-1]=1,ZH[i,anf]=zH[i,anf],ZH[i,anf]=0);
+      A5b{i,K|k>anf}: ZA <-> zA and zA[i,k-1];     
+      A5b1{i} if anf>1: if(ZzA[i,anf-1]=1,ZA[i,anf]=zA[i,anf],ZA[i,anf]=0);
+      A6a{i,K}: ZB <-> ZH or ZA;
+      A6b{i,K}: ZN <-> ~ZH and ~ZA;
+      
+      A7{i,w} if BC[8]: sum{k|kw} zH <= Max(1,Floor(0.7*KW)) + Sl(Ceil(0.4*KW),1) "Equilibrate home games over week";
+
+      /** Additional cuts, may speed up the solution */
+      AX0{i,K}: zH + zA = 1;
+      AX1{K}: sum{i} ZH = sum{i} ZA;  --28secs-->22secs
+      AX2{K}: sum{i} ZB=0 or sum{i} ZB>=2;
+      AX3{i,K}: ZB + ZN = 1;     
+      
+      --AX4{K}: sum{i,j} x = #i/2;
+      --AX5{i,j,j1,K[k]|j<>j1}: x[i,j,k] -> ~x[i,j1,k];     
+      --AX6{i,j,K[k],K[k1]|k<>k1}: x[i,j,k] -> ~x[i,j,k1];     
+      --AX7{i,j,j1,K[k]|j<>j1}: x[i,j,k] -> ~x[j1,i,k];     
+      --AX8{i,j,K[k],K[k1]|k<>k1}: x[i,j,k] -> ~x[j,i,k1]; 
+      --AX9{i,j,K}: zH -> ~x[j,i,k];    
+      --AXa{i,j,K}: zA -> ~x[i,j,k];    
+
+      /** Constraint Types (1-7) (see file ConstraintsDoc.ods */
+      C01{c|Fx=1}: sum{i,j,k|FX01} x >= 1 - Sl(Pen<PEN,Pen);
+      C02{FX02[c,i,j,k]}: x <= Sl(Pen<PEN,Pen);
+      C05h{FX05[c,i,j,k]}: zH[i,k] + zH[j,k] <= 1 + Sl(Pen<PEN,Pen);
+      C05a{FX05[c,i,j,k]}: zA[i,k] + zA[j,k] <= 1 + Sl(Pen<PEN,Pen);
+      //C06{FX06[c,i,j,j1,k],K|K<ende}: x[j1,i,k+1] >= x[j,i,k] - Sl(Pen<PEN,Pen);
+      C06a{c|Fx=6}: sum{i,j1,k|FX06a} x[i,j1,k] >= 1 - Sl(Pen<PEN,Pen);
+      C06{FX06a[c,i,j1,k]|k<ende}: sum{j|FX06} x[j,j1,k+1] >= x[i,j1,k] - Sl(Pen<PEN,Pen);
+--      C06b{FX06a[c,i,j1,k]|k<ende}: sum{j|FX06} (x[i,j,k+1] + x[j,i,k+1]) >= x[i,j1,k] - Sl(Pen<PEN,Pen);
+      C06b{FX06a[c,i,j1,k]|k<ende}: zH[i,k+1] >= x[i,j1,k] - Sl(Pen<PEN,Pen);
+      C07{FX07[c,i,j,j1],K}:  zA[j1,k] >= x[i,j,k] - Sl(Pen<PEN,Pen);
+
+      /** Constraint (11-20) H, A, B, N, HB, -HB, AB -AB, BS, NS, D, HG */
+      C11a{c|Fx=11 and REG>0}: sum{i,K | FX11} zH >=  REG - Sl(5*(Pen<PEN),Pen);
+      C11b{c|Fx=11 and REG<0}: sum{i,K | FX11} zH <= -REG + Sl(5*(Pen<PEN),Pen);
+      C12a{c|Fx=12 and REG>0}: sum{i,K | FX12} zA >=  REG - Sl(5*(Pen<PEN),Pen);
+      C12b{c|Fx=12 and REG<0}: sum{i,K | FX12} zA <= -REG + Sl(5*(Pen<PEN),Pen);
+      C13a{c|Fx=13 and REG>0}: sum{i,K | FX13} ZB >=  REG - Sl(5*(Pen<PEN),Pen);
+      C13b{c|Fx=13 and REG<0}: sum{i,K | FX13} ZB <= -REG + Sl(5*(Pen<PEN),Pen);
+      C14a{c|Fx=14 and REG>0}: sum{i,K | FX14} ZN >=  REG - Sl(5*(Pen<PEN),Pen);
+      C14b{c|Fx=14 and REG<0}: sum{i,K | FX14} ZN <= -REG + Sl(5*(Pen<PEN),Pen);
+      C15a{c|Fx=15 and REG>0}: sum{i,K | FX15} ZH >=  REG - Sl(5*(Pen<PEN),Pen);
+      C15b{c|Fx=15 and REG<0}: sum{i,K | FX15} ZH <= -REG + Sl(5*(Pen<PEN),Pen);
+      C16a{c|Fx=16 and REG>0}: sum{i,K | FX16} (ZA+ZN) >=  REG - Sl(5*(Pen<PEN),Pen);
+      C16b{c|Fx=16 and REG<0}: sum{i,K | FX16} (ZA+ZN) <= -REG + Sl(5*(Pen<PEN),Pen);
+      C17a{c|Fx=17 and REG>0}: sum{i,K | FX17} ZA >=  REG - Sl(5*(Pen<PEN),Pen);
+      C17b{c|Fx=17 and REG<0}: sum{i,K | FX17} ZA <= -REG + Sl(5*(Pen<PEN),Pen);
+      C18a{c|Fx=18 and REG>0}: sum{i,K | FX18} (ZH+ZN) >=  REG - Sl(5*(Pen<PEN),Pen);
+      C18b{c|Fx=18 and REG<0}: sum{i,K | FX18} (ZH+ZN) <= -REG + Sl(5*(Pen<PEN),Pen);
+      C19a{FX19[c,i,k]|K}: if(k=anf,ZzH[i,anf-1],zH[i,k-1]) + zA >= 1 - Sl(Pen<PEN,Pen);
+      C19b{FX19[c,i,k]|K}: if(k=anf,ZzA[i,anf-1],zA[i,k-1]) + zH >= 1 - Sl(Pen<PEN,Pen);
+      C20a{FX20[c,i,k]|K}: if(k=anf,ZzH[i,anf-1],zH[i,k-1]) + zH <= 1 + Sl(Pen<PEN,Pen);
+      C20b{FX20[c,i,k]|K}: if(k=anf,ZzA[i,anf-1],zA[i,k-1]) + zA <= 1 + Sl(Pen<PEN,Pen);
+      
+      /** Constraint 21: D -- Distribute matches between teams */
+      C21a{c,K|Fx=21 and REG<0}: sum{i,j|FX21} x[i,j,k] <= -REG + Sl(5*(Pen<PEN),Pen);
+      C21b{c,K|Fx=21 and REG>0}: sum{i,j|FX21} x[i,j,k] >=  REG - Sl(5*(Pen<PEN),Pen);
+
+      /** Constraint 22: HG -- Home games per Round Robin (RR) */
+      C22a{c,i|Fx=22 and REG<0 and NMO<>7 and loop%2=1}: sum{K,j|FX22} x <= -REG + Sl(5*(Pen<PEN),Pen);
+      C22b{c,i|Fx=22 and REG>0 and NMO<>7 and loop%2=1}: sum{K,j|FX22} x >=  REG - Sl(5*(Pen<PEN),Pen);
+      C22a1{c,i|Fx=22 and REG<0 and NMO=7}: sum{K,j|FX22 and k<mid} x <= -REG + Sl(5*(Pen<PEN),Pen);  ///new 2024/06/15
+      C22b1{c,i|Fx=22 and REG>0 and NMO=7}: sum{K,j|FX22 and k<mid} x >=  REG - Sl(5*(Pen<PEN),Pen);
+      C22a2{c,i|Fx=22 and REG<0 and NMO=7}: sum{K,j|FX22 and k>=mid} x <= -REG + Sl(5*(Pen<PEN),Pen);
+      C22b2{c,i|Fx=22 and REG>0 and NMO=7}: sum{K,j|FX22 and k>=mid} x >=  REG - Sl(5*(Pen<PEN),Pen);
+      /** Constraint 23: SH -- Home-games against strong teams */
+      C23{c,i,K[k]|Fx=23 and k<=ende-REG}: sum{j,k1|FX23a[c,j] and k<=k1<=k+REG} x[i,j,k1] <= 1 + Sl(5*(Pen<PEN),Pen);
+      C23x{c,i,K[k]|Fx=23 and NMO=6 and loop%2=0 and k<=anf+REG and sum{j,k1|FX23a[c,j] and k-REG<=k1<anf} Z[i,j,k1] >= 1}: sum{j,k1|FX23a[c,j] and k1<=k} x[i,j,k1] <= 0 + Sl(5*(Pen<PEN),Pen);
+      C23y{c,i,K[k]|Fx=23 and NMO=1 and NNR>1 and k<=anf+REG}: sum{j,k1|FX23a[c,j] and ende+k-REG<=k1<=ende} x[j,i,k1] + sum{j,k1|FX23a[c,j] and k1<=k} x[i,j,k1] <= 1 + Sl(5*(Pen<PEN),Pen);
+      --C23A{c,i,K[k]|Fx=23 and NMO=1 and NNR>1 and k<=ende-REG}: sum{j,k1|FX23a[c,j] and k<=k1<=k+REG} x[j,i,k1] <= 1 + Sl(5*(Pen<PEN),Pen);
+      --C23Ay1{c,i,K[k]|Fx=23 and NMO=1 and NNR>1 and loop%2=1 and k<=anf+REG}: sum{j,k1|FX23a[c,j] and k1<=REG-k+1} x[i,j,ende+1-k1] + sum{j,k1|FX23a[c,j] and k1<=k} x[j,i,k1] <= 1 + Sl(5*(Pen<PEN),Pen);
+      /** Constraint 28: S -- Games against strong teams */
+      --C28{c,i,K[k]|Fx=28 and k<=ende-REG}: sum{j,k1|FX28a[c,j] and k<=k1<=k+REG} (x[i,j,k1]+x[j,i,k1]) <= 1 + Sl(5*(Pen<PEN),Pen); //1. formulation
+      --C28{c,i,j,K[k]|Fx=28 and FX28a[c,j] and k<=ende-REG}: x[i,j,k]+x[j,i,k] + sum{j1,k1|FX28a[c,j1] and k<k1<=k+REG and j1<>j} (x[i,j1,k1]+x[j1,i,k1]) <= 1 + Sl(5*(Pen<PEN),Pen); //2- formulation
+      C28a{c,i,j,K[k]|Fx=28 and FX28a[c,j] and k<=ende-REG}:
+        x[j,i,k] + sum{j1,k1|FX28a[c,j1] and k<k1<=k+REG and j1<>j} (x[i,j1,k1]+x[j1,i,k1]) <= 1 + Sl(5*(Pen<PEN),Pen);  //3. formulation
+      C28b{c,i,j,K[k]|Fx=28 and FX28a[c,j] and k<=ende-REG}:
+        x[i,j,k] + sum{j1,k1|FX28a[c,j1] and k<k1<=k+REG and j1<>j} (x[i,j1,k1]+x[j1,i,k1]) <= 1 + Sl(5*(Pen<PEN),Pen);  //3. formulation
+      --C28b1{FX28i[c,i,j,j1],K[k],k1|Fx=28 and k<=ende-REG and k<k1<=k+REG}: x[i,j,k] + x[i,j1,k1] <= 1 + Sl(5*(Pen<PEN),Pen);  //4. formulation
+      --C28b2{FX28i[c,i,j,j1],K[k],k1|Fx=28 and k<=ende-REG and k<k1<=k+REG}: x[i,j,k] + x[j1,i,k1] <= 1 + Sl(5*(Pen<PEN),Pen);  //4. formulation
+      --C28b3{FX28i[c,i,j,j1],K[k],k1|Fx=28 and k<=ende-REG and k<k1<=k+REG}: x[j,i,k] + x[i,j1,k1] <= 1 + Sl(5*(Pen<PEN),Pen);  //4. formulation
+      --C28b4{FX28i[c,i,j,j1],K[k],k1|Fx=28 and k<=ende-REG and k<k1<=k+REG}: x[j,i,k] + x[j1,i,k1] <= 1 + Sl(5*(Pen<PEN),Pen);  //4. formulation
+      
+      C28x{c,i,K[k]|Fx=28 and NMO=6 and loop%2=0 and k<=anf+REG and sum{j,k1|FX28a[c,j] and k-REG<=k1<anf} (Z[i,j,k1]+Z[j,i,k1]) >= 1}:
+        sum{j,k1|FX28a[c,j] and k1<=k} (x[i,j,k1]+x[j,i,k1]) <= 0 + Sl(5*(Pen<PEN),Pen);
+      C28y{c,i,K[k]|Fx=28 and NMO=1 /*and loop%2=1*/ and k<=anf+REG}:
+        sum{j,k1|FX28a[c,j] and ende+k-REG<=k1<=ende} (x[i,j,k1]+x[j,i,k1]) + sum{j,k1|FX28a[c,j] and k1<=k} (x[i,j,k1]+x[j,i,k1]) <= 1 + Sl(5*(Pen<PEN),Pen);
+      --- another formulation: seems not better ??
+      --C23{c,i,K[k],k1,FX23[c,j,j1]|Fx=23 and k<=ende-REG and k1>k and k1<=k+REG and i<>j and i<>j1}: x[i,j,k]+x[i,j1,k1] <= 1 + Sl((Pen<PEN),Pen);
+      --C28{c,i,FX28[c,j,j1],k,k1|Fx=28 and k<=ende-REG and k<k1<=k+REG}: x[i,j,k]+x[j,i,k]+x[i,j1,k1]+x[j1,i,k1] <= 1 + Sl((Pen<PEN),Pen);
+      --C28a{c,i,K[k],k1,FX28[j,j1]|Fx=28 and k<=ende-REG and k1>k and k1<=k+REG and i<>j and i<>j1}: x[i,j,k]+x[i,j1,k1] <= 1 + Sl((Pen<PEN),Pen);
+      --C28b{c,i,K[k],k1,FX28[j,j1]|Fx=28 and k<=ende-REG and k1>k and k1<=k+REG and i<>j and i<>j1}: x[i,j,k]+x[j1,i,k1] <= 1 + Sl((Pen<PEN),Pen);
+      --C28c{c,i,K[k],k1,FX28[j,j1]|Fx=28 and k<=ende-REG and k1>k and k1<=k+REG and i<>j and i<>j1}: x[j,i,k]+x[i,j1,k1] <= 1 + Sl((Pen<PEN),Pen);
+      --C28d{c,i,K[k],k1,FX28[j,j1]|Fx=28 and k<=ende-REG and k1>k and k1<=k+REG and i<>j and i<>j1}: x[j,i,k]+x[j1,i,k1] <= 1 + Sl((Pen<PEN),Pen);
+
+      /** Constraint (31) HHH or AAA */
+      C31h{FX31[c,i],K}:
+        if(k=anf  ,ZzH[i,k-2]+ZzH[i,k-1]+zH[i,k],
+           k=anf+1,ZzH[i,k-2]+ zH[i,k-1]+zH[i,k],
+                   zH[i,k-2]+ zH[i,k-1]+zH[i,k]) <= 2 + Sl(Pen<PEN,Pen);
+      C31H{FX31[c,i],K} if NMO<=5 and NMO>0 and NNR%2=0:
+        if(k=anf  ,zA[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+           k=anf+1,zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+                   zH[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]]) <= 2 + Sl(Pen<PEN,Pen);
+      C31a{FX31[c,i],K}: 
+        if(k=anf  ,ZzA[i,k-2]+ZzA[i,k-1]+zA[i,k],
+           k=anf+1,ZzA[i,k-2]+ zA[i,k-1]+zA[i,k],
+                   zA[i,k-2]+ zA[i,k-1]+zA[i,k]) <= 2 + Sl(Pen<PEN,Pen);
+      C31A{FX31[c,i],K} if NMO<=5 and NMO>0 and NNR%2=0:
+        if(k=anf  ,zH[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+           k=anf+1,zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+                   zA[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]]) <= 2 + Sl(Pen<PEN,Pen);
+
+      /** Rules 1 for dummy x team: HxH / AxA */
+      C31DUMhh{k,i|k>anf and k<ende} if DUM and BC[9]:
+        x[DUM,i,k] + zH[i,k-1] + zH[i,k+1] <= 2;
+      C31DUMaa{k,i|k>anf and k<ende} if DUM and BC[9]:
+        x[i,DUM,k] + zA[i,k-1] + zA[i,k+1] <= 2;
+
+      /** Rules 2 for dummy x team: HHxH / HxHH / AxAA / AAxA */
+      C31DUMa{k,i|anf<k<ende-1} if DUM and ~BC[9]:
+        x[i,DUM,k] + zA[i,k-1] + zA[i,k+1] + zA[i,k+2] <= 3;
+      C31DUMb{k,i|anf+1<k<ende} if DUM and ~BC[9]:
+        x[i,DUM,k] + zA[i,k-2] + zA[i,k-1] + zA[i,k+1] <= 3;
+      C31DUMc{k,i|anf<k<ende-1} if DUM and ~BC[9]:
+        x[DUM,i,k] + zH[i,k-1] + zH[i,k+1] + zH[i,k+2] <= 3;
+      C31DUMd{k,i|anf+1<k<ende} if DUM and ~BC[9]:
+        x[DUM,i,k] + zH[i,k-2] + zH[i,k-1] + zH[i,k+1] <= 3; 
+      
+      C31DUMh1{i} if DUM and NMO=1: 
+        x[DUM,i,ende] + zH[i,ende-1] + zA[i,anf] <= 2;
+      C31DUMa1{i} if DUM and NMO=1: 
+        x[i,DUM,ende] + zA[i,ende-1] + zH[i,anf] <= 2;
+      C31DUMh2{i} if DUM and NMO=6 and loop%2=0: 
+        Z[DUM,i,anf-1] + ZzH[i,anf-2] + zH[i,anf] <= 2;
+      C31DUMa2{i} if DUM and NMO=6 and loop%2=0: 
+        Z[i,DUM,anf-1] + ZzA[i,anf-2] + zA[i,anf] <= 2;
+      
+        
+      --C31x{FX31[c,i],K|k<ende}: ZB[i,k]+ZB[i,k+1] <= 1 + Sl(Pen<PEN,Pen);
+      --C31y{FX31[c,i],K|k<ende}: ZH[i,k]+ZH[i,k+1] <= 1 + Sl(Pen<PEN,Pen);
+      --C31z{FX31[c,i],K|k<ende}: ZA[i,k]+ZA[i,k+1] <= 1 + Sl(Pen<PEN,Pen);
+      --C31o{FX31[c,i],K|k<ende-1}: sum{j} (x[i,j,k]+x[i,j,k+1]+x[i,j,k+2]) <= 2 + Sl(Pen<PEN,Pen);
+      --C31p{FX31[c,i],K|k<ende-1}: sum{j} (x[j,i,k]+x[j,i,k+1]+x[j,i,k+2]) <= 2 + Sl(Pen<PEN,Pen);
+
+      /** Constraint (32) HHAA or AAHH */
+      C32h{FX32[c,i],K}:
+        if(k=anf  ,ZzH[i,k-3]+ZzH[i,k-2]+ZzA[i,k-1]+zA[i,k],
+           k=anf+1,ZzH[i,k-3]+ZzH[i,k-2]+ zA[i,k-1]+zA[i,k],
+           k=anf+2,ZzH[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k],
+                   zH[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k]) <= 3 + Sl(Pen<PEN,Pen);
+      C32H{FX32[c,i],K} if NMO<=5 and NMO>0 and NNR%2=0: 
+        if(k=anf  ,zA[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+           k=anf+1,zA[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+           k=anf+2,zA[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+                   zH[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]]) <= 3 + Sl(Pen<PEN,Pen);
+      C32a{FX32[c,i],K}:
+        if(k=anf  ,ZzA[i,k-3]+ZzA[i,k-2]+ZzH[i,k-1]+zH[i,k],
+           k=anf+1,ZzA[i,k-3]+ZzA[i,k-2]+ zH[i,k-1]+zH[i,k],
+           k=anf+2,ZzA[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k],
+                   zA[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k])  <= 3 + Sl(Pen<PEN,Pen);
+      C32A{FX32[c,i],K} if NMO<=5 and NMO>0 and NNR%2=0: 
+        if(k=anf  ,zH[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+           k=anf+1,zH[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+           k=anf+2,zH[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+                   zA[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]]) <= 3 + Sl(Pen<PEN,Pen);
+      --C32x{FX32[c,i],K|k<ende-1}: ZB[i,k]+ZB[i,k+2] <= 1 + Sl(Pen<PEN,Pen);
+      --C32y{FX32[c,i],K|k<ende-1}: ZH[i,k]+ZA[i,k+2] <= 1 + Sl(Pen<PEN,Pen);
+      --C32z{FX32[c,i],K|k<ende-1}: ZA[i,k]+ZH[i,k+2] <= 1 + Sl(Pen<PEN,Pen);
+
+      /** Constraint (33) HHAHH or AAHAA */
+      C33h{FX33[c,i],K}:
+        if(k=anf  ,ZzH[i,k-4]+ZzH[i,k-3]+ZzA[i,k-2]+ZzH[i,k-1]+zH[i,k],
+           k=anf+1,ZzH[i,k-4]+ZzH[i,k-3]+ZzA[i,k-2]+ zH[i,k-1]+zH[i,k],
+           k=anf+2,ZzH[i,k-4]+ZzH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k],
+           k=anf+3,ZzH[i,k-4]+ zH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k],
+                   zH[i,k-4]+ zH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k]) <= 4 + Sl(Pen<PEN,Pen);
+      C33H{FX33[c,i],K} if NMO<=5 and NMO>0 and NNR%2=0: 
+        if(k=anf  ,zA[i,RX[k-4+KK]]+zA[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+           k=anf+1,zA[i,RX[k-4+KK]]+zA[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+           k=anf+2,zA[i,RX[k-4+KK]]+zA[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+           k=anf+3,zA[i,RX[k-4+KK]]+zH[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]],
+                   zH[i,RX[k-4+KK]]+zH[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zH[i,RX[k+KK]]) <= 4 + Sl(Pen<PEN,Pen);
+      C33a{FX33[c,i],K}:
+        if(k=anf  ,ZzA[i,k-4]+ZzA[i,k-3]+ZzH[i,k-2]+ZzA[i,k-1]+zA[i,k],
+           k=anf+1,ZzA[i,k-4]+ZzA[i,k-3]+ZzH[i,k-2]+ zA[i,k-1]+zA[i,k],
+           k=anf+2,ZzA[i,k-4]+ZzA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k],
+           k=anf+3,ZzA[i,k-4]+ zA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k],
+                   zA[i,k-4]+ zA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k]) <= 4 + Sl(Pen<PEN,Pen);
+      C33A{FX33[c,i],K} if NMO<=5 and NMO>0 and NNR%2=0: 
+        if(k=anf  ,zH[i,RX[k-4+KK]]+zH[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zH[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+           k=anf+1,zH[i,RX[k-4+KK]]+zH[i,RX[k-3+KK]]+zA[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+           k=anf+2,zH[i,RX[k-4+KK]]+zH[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+           k=anf+3,zH[i,RX[k-4+KK]]+zA[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]],
+                   zA[i,RX[k-4+KK]]+zA[i,RX[k-3+KK]]+zH[i,RX[k-2+KK]]+zA[i,RX[k-1+KK]]+zA[i,RX[k+KK]]) <= 4 + Sl(Pen<PEN,Pen);
+  
+      // Constraint (34) HHAxHH / HHxAHH / AAHxAA / AAxHAA (x=dummy)                      
+      C33DUMa{FX33[c,i],K|anf+1<k<ende-2} if DUM: x[i,DUM,k] + zH[i,k-2] + zH[i,k-1] + zA[i,k+1] + zH[i,k+2] + zH[k,k+3] <= 5;
+      C33DUMb{FX33[c,i],K|anf+2<k<ende-1} if DUM: x[i,DUM,k] + zH[k,k+3] + zH[i,k-2] + zA[i,k-1] + zH[i,k+1] + zH[i,k+2] <= 5;
+      C33DUMc{FX33[c,i],K|anf+1<k<ende-2} if DUM: x[DUM,i,k] + zA[i,k-2] + zA[i,k-1] + zH[i,k+1] + zA[i,k+2] + zA[k,k+3] <= 5;
+      C33DUMd{FX33[c,i],K|anf+2<k<ende-1} if DUM: x[DUM,i,k] + zA[k,k+3] + zA[i,k-2] + zH[i,k-1] + zA[i,k+1] + zA[i,k+2] <= 5;
+      
+      --C33x{FX33[c,i],K|k<ende-2}: ZB[i,k]+ZB[i,k+3] <= 1 + Sl(Pen<PEN,Pen);
+      /** Constraint (34) HHAHAA or AAHAHH */
+      C34h{FX34[c,i],K}: 
+        if(k=anf  ,ZzH[i,k-5]+ZzH[i,k-4]+ZzA[i,k-3]+ZzH[i,k-2]+ZzA[i,k-1]+zA[i,k],
+           k=anf+1,ZzH[i,k-5]+ZzH[i,k-4]+ZzA[i,k-3]+ZzH[i,k-2]+ zA[i,k-1]+zA[i,k],
+           k=anf+2,ZzH[i,k-5]+ZzH[i,k-4]+ZzA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k],
+           k=anf+3,ZzH[i,k-5]+ZzH[i,k-4]+ zA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k],
+           k=anf+4,ZzH[i,k-5]+ zH[i,k-4]+ zA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k],
+                   zH[i,k-5]+ zH[i,k-4]+ zA[i,k-3]+ zH[i,k-2]+ zA[i,k-1]+zA[i,k]) <= 5 + Sl(Pen<PEN,Pen);
+      C34a{FX34[c,i],K}: 
+        if(k=anf  ,ZzA[i,k-5]+ZzA[i,k-4]+ZzH[i,k-3]+ZzA[i,k-2]+ZzH[i,k-1]+zH[i,k],
+           k=anf+1,ZzA[i,k-5]+ZzA[i,k-4]+ZzH[i,k-3]+ZzA[i,k-2]+ zH[i,k-1]+zH[i,k],
+           k=anf+2,ZzA[i,k-5]+ZzA[i,k-4]+ZzH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k],
+           k=anf+3,ZzA[i,k-5]+ZzA[i,k-4]+ zH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k],
+           k=anf+4,ZzA[i,k-5]+ zA[i,k-4]+ zH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k],
+                   zA[i,k-5]+ zA[i,k-4]+ zH[i,k-3]+ zA[i,k-2]+ zH[i,k-1]+zH[i,k]) <= 5 + Sl(Pen<PEN,Pen);
+      //yy{i}: ZB[i,ende-1] = 0; this helps to make the second Ro feasible !!!
+
+      /** Constraint 36: BB -- Number of breaks per double-RR */
+      C36a{FX36[c,i] | REG<=0} if loop%2=1: sum{K} ZB + sum{k|k<anf and k>=anf-KK} ZZB <= -REG + Sl(10*(Pen<PEN),Pen);
+      C36b{FX36[c,i] | REG>0}  if loop%2=1: sum{K} ZB + sum{k|k<anf and k>=anf-KK} ZZB >= REG  - Sl(10*(Pen<PEN),Pen);
+--alternatively check!!!      C36a{FX36[c,i] | REG<=0} if loop%2=0 or runDouble: sum{K} ZB + if(~runDouble,sum{k|k<anf and k>=anf-KK} ZZB) <= -REG + Sl(10*(Pen<PEN),Pen);
+--      C36b{FX36[c,i] | REG>0}  if loop%2=0 or runDouble: sum{K} ZB + if(~runDouble,sum{k|k<anf and k>=anf-KK} ZZB) >= REG  - Sl(10*(Pen<PEN),Pen);
+
+      /** Constraint 37: BH -- Number of H-breaks per RR */
+      C37a{FX37[c,i] | REG<=0}: sum{K} ZH <= -REG + Sl(10*(Pen<PEN),Pen);
+      C37b{FX37[c,i] | REG>0} : sum{K} ZH >= REG  - Sl(10*(Pen<PEN),Pen);
+
+      /** Constraint 38: BA -- Number of A-breaks per RR */
+      C38a{FX38[c,i] | REG<=0}: sum{K} ZA <= -REG + Sl(10*(Pen<PEN),Pen);
+      C38b{FX38[c,i] | REG>0} : sum{K} ZA >= REG  - Sl(10*(Pen<PEN),Pen);
+
+      /** Constraint 39: BB1 -- Number of breaks in first RR */
+      C39a{FX39[c,i] | REG<=0} if loop%2=1 or runDouble: sum{K|k<mid} ZB <= -REG + Sl(10*(Pen<PEN),Pen);
+      C39b{FX39[c,i] | REG>0}  if loop%2=1 or runDouble: sum{K|k<mid} ZB >= REG  - Sl(10*(Pen<PEN),Pen);
+
+      /** Constraint 49: BB2 -- Number of breaks in second RR */
+      C49a{FX49[c,i] | REG<=0} if loop%2=0 or runDouble: sum{K|k>=mid} ZB <= -REG + Sl(10*(Pen<PEN),Pen);
+      C49b{FX49[c,i] | REG>0}  if loop%2=0 or runDouble: sum{K|k>=mid} ZB >= REG  - Sl(10*(Pen<PEN),Pen);
+      
+      /** Constraint 50: DD -- Distribute Matches */
+      C50{FX50a[c,k] | Fx=50 and REG<=0}: sum{i,j|FX50} x[i,j,k] <= -REG + Sl(10*(Pen<PEN),Pen);
+      C50a{FX50a[c,k]| Fx=50 and REG> 0}: sum{i,j|FX50} x[i,j,k] >=  REG - Sl(10*(Pen<PEN),Pen);
+//      C50{c|Fx=50 and REG<=0}: sum{i,j,k|FX50 and FX50a} x[i,j,k] <= -REG + Sl(10*(Pen<PEN),Pen);
+//      C50a{c|Fx=50 and REG>=0}: sum{i,j,k|FX50 and FX50a} x[i,j,k] >= REG - Sl(10*(Pen<PEN),Pen);
+--      C50{c,K|Fx=50 and REG<=0}: sum{i,j|FX50[c,i,j]} x[i,j,k] <= -REG + Sl(10*(Pen<PEN),Pen);
+      // C43 minmal distances not yet implemented
+  end;
+  
+  model GetViolations "Return the violations";
+    /** The model runs through all Sl (slack variables) and returns all positive
+        values, which are then written to the league.nom file */
+    Write('+:league.nom','opt %d\n',GetParam(5));
+    parameter tot:=0; v; value; c; string s;
+    while NextFocus(19) do
+      while NextPosition do
+        value:=GetValue(0);
+        s:=GetName(6);
+        if Strsub(s,1,7)='A2max_x' then value:=0; end; //a hack 
+        if Strsub(s,1,4)='A7_x' then value:=0; end; //a hack 
+        if value then
+          v:=Strpos('=',s)+1;
+          c:=Strfloat(Strsub(s,v,4)); 
+          Write('+:league.nom','%s = %5.2f %d %d\n', GetName(6),value,c,Pen[c]);
+          tot:=tot+Pen[c]*value;
+          Vio[c]:=Vio[c]+value;
+        end
+      end
+    end
+    Write('+:league.nom','Total Penalties=%d\n',tot);
+    Write('+:league.nom','---\n');
+  end
+  
+  model FirstRR "Run first RR in Main1";
+    runDouble:=0;
+    K{k}:= k>=anf and k<=ende;
+    KW{w}:=sum{K[k]|kw} 1;
+    ClearData(Common1);
+    Common1;
+      
+    constraint
+      A1{i,j|i<j} if ~BC[7] and BC[1]: sum{K} (x[i,j,k]+x[j,i,k]) = 1 "Each match exactly once";
+      A1a{i,j} if ~BC[7] /*and ~BC[1]*/: sum{K} x[i,j,k] <= 1;
+      --A1b{i,j|i<j} if ~BC[7] and ~BC[1]: sum{K} (x[i,j,k]+x[j,i,k]) <= 1  + Sl(BC[1]=0,1) "Each match exactly once";
+      ---A1{i,j|i<j}: sum{K} (x[i,j,k]+x[j,i,k]) = if(group[i]=group[j],GNR/NNR,1) "Each match exactly once";
+      A2{i,K} if ~BC[7]: sum{j} (x[i,j,k]+x[j,i,k]) = 1     "Each team in each round";
+
+      ---- Number of A and H can differ by maximum one     
+      B0{i|showI} if ~BC[7] and BC[2]: Floor(N1/2) <= sum{j,K|i<>j and showI[j]} x[i,j,k] <= Floor(N1/2)+1; // Ceil(N1/2);
+      
+    solve subject_to FirstRR,Common1;   
+    SolverStatus:=GetSolverStatus();
+    Z{i,j,K}:=x; ZzH{i,K}:=zH; ZzA{i,K}:=zA; ZZB{i,K}:=ZB; 
+    GetViolations;   
+  end
+  
+  model SecondRR "Run second RR in Main1";
+    K{k}:= k>=anf and k<=ende;
+    KW{w}:=sum{K[k]|kw} 1;
+    ClearData(Common1);
+    Common1;
+    
+    parameter P{i,j}:=exist{k|k>=anf-KK and k<anf} Z[i,j,k]; //already in first RR
+
+    constraint
+      A1{i,j|i<j} if ~BC[7] and BC[1]: sum{K} (x[i,j,k]+x[j,i,k]) = 1 "Each match exactly once";
+      A1a{i,j} if ~BC[7] /*and ~BC[1]*/: sum{K} x[i,j,k] <= 1;
+      --A1b{i,j|i<j} if ~BC[7] and ~BC[1]: sum{K} (x[i,j,k]+x[j,i,k]) <= 1  + Sl(BC[1]=0,1);
+      --A1{i,j|i<j}: sum{K} (x[i,j,k]+x[j,i,k]) = if(group[i]=group[j],GNR/NNR,1);
+      A2{i,K} if ~BC[7]: sum{j} (x[i,j,k]+x[j,i,k]) = 1  "Each team in each round";
+
+      A4a{i,j,K|P} if ~BC[7]: x = 0            "is already in first RR"; 
+
+      A1X{i} if ~BC[7]: sum{K} zA = sum{k|k>=anf-KK and k<anf} ZzH "Additional cuts, may speed up the solution";
+      A2X{i} if ~BC[7]: sum{K} zH = sum{k|k>=anf-KK and k<anf} ZzA;
+      --A3X{i,j|~P}: sum{K} x = 1;
+
+    if NMO=6 then 
+      solve subject_to SecondRR,Common1;
+      SolverStatus:=GetSolverStatus();
+      Z{i,j,K}:=x; ZzH{i,K}:=zH; ZzA{i,K}:=zA; ZZB{i,K}:=ZB; 
+      parameter zb{i,k}:=ZB; 
+    else
+      {i,j,k|k>ende-KK and k<=ende} (Z[i,j,k]:=Z[j,i,RX[k]]);
+    end;    
+    GetViolations;    
+  end
+  
+  model DoubleRR "Run Double RR";
+    runDouble:=1;
+    K{k}:= k>=anf and k<=ende;
+    KW{w}:=sum{K[k]|kw} 1;
+    ClearData(Common1);
+    Common1;
+    
+    --x{i,j,K}:=ZZ;  //warm start
+    --constraint ZZZ{i,j,K}: x[i,j,K]=ZZ+yy-zz;  //warm start
+
+    constraint
+      A1{i,j} if ~BC[7]: sum{K} x[i,j,k] = 1              "Each game (i,j) once in a 2RR";
+      A2{i,K} if ~BC[7]: sum{j} (x[i,j,k]+x[j,i,k]) = 1   "Each team in each round";
+      A2a{i,j|i<j} if ~BC[7] and BC[1]: sum{K|k<anf+KK} (x[i,j,k]+x[j,i,k]) = 1 "In first RoRo: each match (i=j) once";
+      --A2b{i,j|i<j} if ~BC[7] and BC[1]: sum{K|k>=anf+KK} (x[i,j,k]+x[j,i,k]) = 1 "In first RoRo: each match (i=j) once";
+      --A2b{i,j|i<j} if ~BC[7] and ~BC[1]: sum{K|k<anf+KK} (x[i,j,k]+x[j,i,k]) <= 1 + Sl(BC[1]=0,10) "In first RoRo: each match (i=j) once";
+
+      --xx{i,j,k|k<=11}: x>=Z; //-Sl(1,1000);
+      A2cX{i} if ~BC[7]: sum{K} zA = sum{K} zH  "Added to speedup the solver";
+      A2cY{i} if ~BC[7]: sum{K|k<anf+KK} zA = sum{K|k>=anf+KK} zH;
+      
+      // ----various cuts that may help
+      --XX1{K}: sum{i} zH=#i/2;  --28secs-->35secs
+      --XX2{K}: sum{i} zA=#i/2;      
+      --XX5a{i,K|k<ende}: zA + ZH[i,k+1] <= 1;
+      --XX5b{i,K|k<ende}: zH + ZA[i,k+1] <= 1;
+      --XX5c{i,K|k<ende}: zH - ZA[i,k+1] >= 0;
+      --XX6{i}: sum{k|k>1} ZB <= Ceil(#k/3);  -- if AAHH and HHAA are not allowed
+      --XX7a{i}: sum{k|k>1} ZA - sum{k|k>1} ZH <= 1;
+      --XX7b{i}: sum{k|k>1} ZH - sum{k|k>1} ZA <= 1;
+
+           
+---      B0{i|showI} if ~BC[7] and BC[2]: Floor(N1/2) <= sum{j,K|i<>j and showI[j] and k<anf+KK} x[i,j,k] <= Ceil(N1/2);
+      B0{i} if ~BC[7] and BC[2]: Floor(N1/2) <= sum{j,K|i<>j and k<anf+KK and showI[j]} x[i,j,k] <= Floor(N1/2)+1; //Ceil(N1/2) "Number of A and H can differ by maximum one";
+     -- B0a{i} if ~BC[7] and BC[2] if DUM: Floor(N1/2) <= sum{j,K|i<>j and k<anf+KK and showI} x[i,j,k] <= Floor(N1/2); //Ceil(N1/2);
+
+    solve subject_to DoubleRR,Common1;
+    SolverStatus:=GetSolverStatus();
+    Z{i,j,K}:=x; ZzH{i,K}:=zH; ZzA{i,K}:=zA; ZZB{i,K}:=ZB;        
+    GetViolations;  
+  end
+
+  model VerifyRR "Verify if a RR is legal";
+    // loop is odd if FirstRR is running
+    K{k}:=k>=anf and k<=ende;
+    parameter ZZ{i,j,K}; {kij[k,i,j]|K and block}  (ZZ:=1);  
+    ClearData(Common1);
+    Common1;
+    constraint
+      A1a{i,j} if ~BC[7] and /*loop%2=1:*/ sum{K} (x[i,j,k]+x[j,i,k]) <= 1;
+      --A1b{i,j} if ~BC[7] and loop%2=0: sum{K} x[i,j,k] = 1;
+      A2{i,K} if ~BC[7]: sum{j} (x[i,j,k]+x[j,i,k]) = 1   "Each team in each round";
+      A2aa{i,j|i<j} if ~BC[7] and BC[1]: sum{K|k<anf} (x[i,j,k]+x[j,i,k]) = 1 "In first RoRo: each match (i=j) once";
+      A{i,j,K}: x=ZZ;
+    solve subject_to VerifyRR,Common1;
+    SolverStatus:=GetSolverStatus();
+    Z{i,j,K}:=x;  ZzH{i,K}:=zH; ZzA{i,K}:=zA; ZZB{i,K}:=ZB;  
+    GetViolations;
+    parameter zb{i,k}:=ZB; 
+  end
+
+end
+
+/** \MOproblem
+This is the complete model code in LPL for the tournament application. The Round-Robin
+mode is explained elsewhere in a document.
+
+@+Tournament
+
+------------------------------------------------------------
+\newpage
+
+@%
+
+-------------------------------------------------------------
+\newpage
+
+@§
+
+*/
